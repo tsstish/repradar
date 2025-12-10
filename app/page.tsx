@@ -2,23 +2,29 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, ExternalLink, Star, UtensilsCrossed, Globe, CheckCircle2, Gift, Percent } from "lucide-react";
+import { Send, Star, UtensilsCrossed, Gift, Percent, MapPin, Globe } from "lucide-react";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 
 // ==========================================
-// ⚙️ НАСТРОЙКИ
+// ⚙️ НАСТРОЙКИ (CONFIG)
 // ==========================================
 const RESTAURANT_CONFIG = {
   name: "Тайский Рынок", 
   sub: "Лучшая уличная еда",
   
-  // КЛЮЧИ:
+  // КЛЮЧИ ТЕЛЕГРАМ:
   telegramToken: "8565200728:AAG9sAXuAjx79bVjacs8NeYS1pAI9Uj93Pk", 
   telegramChatId: "6132082486", 
   
-  // ССЫЛКА НА ГУГЛ:
+  // === ССЫЛКИ ДЛЯ ОТЗЫВОВ ===
+  // Если ссылка пустая "" - кнопка не покажется.
+  // Если заполнены обе - покажутся обе.
+  
   googleLink: "https://search.google.com/local/writereview?placeid=ChIJ3__dTNG7HRURVS_EbdpySNg", 
+  
+  // Вставь сюда ссылку на Easy (или оставь пустой "", если пока нет)
+  easyLink: "https://easy.co.il/en/page/10116028", 
   
   IconComponent: UtensilsCrossed, 
   bgIcons: ["🍜", "🍤", "🍣", "🥢", "🍋", "🌶️", "🥥", "🍱"] 
@@ -27,28 +33,28 @@ const RESTAURANT_CONFIG = {
 function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 
 // ==========================================
-// 📝 ПРОДАЮЩИЕ ТЕКСТЫ
+// 📝 ПЕРЕВОДЫ
 // ==========================================
 const translations = {
   ru: { 
     title: "Вам понравилось?", 
     
-    // Сценарий: Плохо (Скидка)
+    // Плохо (Скидка)
     lowRatingTitle: "Давайте мириться!",
     lowRatingText: "Мы допустили ошибку, но хотим её исправить. Ваша СКИДКА 10% на всё меню уже готова.",
     placeholder: "Что именно пошло не так?",
     sendButton: "Получить скидку 10%", 
     
-    // Сценарий: Хорошо (Подарок)
+    // Хорошо (Подарок)
     highRatingTitle: "У вас отличный вкус!",
-    highRatingText: "Поделитесь впечатлениями в Google и получите вкусный КОМПЛИМЕНТ от шефа при следующем заказе.",
-    googleButton: "Забрать подарок", 
+    highRatingText: "Выберите, где оставить отзыв, и получите вкусный КОМПЛИМЕНТ от шефа.",
     
-    // Финал (Скидка)
+    btnGoogle: "Отзыв в Google",
+    btnEasy: "Отзыв в Easy",
+    
+    // Финал
     discountTitle: "Скидка 10% активирована!",
     discountText: "Сделайте скриншот или покажите этот экран официанту при следующем заказе.",
-    
-    // Финал (Подарок)
     giftTitle: "Ваш подарок ждет!",
     giftText: "Спасибо за отзыв! Покажите этот экран официанту и получите ваш комплимент.",
     
@@ -61,8 +67,11 @@ const translations = {
     placeholder: "?מה פחות אהבתם",
     sendButton: "לקבלת 10% הנחה", 
     highRatingTitle: "!יש לכם טעם מעולה",
-    highRatingText: "!שתפו את החוויה ב-Google וקבלו קינוח מתנה בביקור הבא",
-    googleButton: "לקבלת המתנה", 
+    highRatingText: ".בחרו איפה לכתוב ביקורת וקבלו קינוח מתנה בביקור הבא",
+    
+    btnGoogle: "ביקורת ב-Google",
+    btnEasy: "ביקורת ב-Easy",
+    
     discountTitle: "!הנחה 10% הופעלה",
     discountText: ".צלמו מסך או הראו את ההודעה למלצר בביקור הבא",
     giftTitle: "!המתנה שלכם מחכה",
@@ -76,8 +85,11 @@ const translations = {
     placeholder: "What went wrong?",
     sendButton: "Get 10% Discount", 
     highRatingTitle: "You have great taste!",
-    highRatingText: "Share your thoughts on Google and get a delicious COMPLIMENT on us next time.",
-    googleButton: "Claim Your Gift", 
+    highRatingText: "Choose where to leave a review and get a delicious COMPLIMENT.",
+    
+    btnGoogle: "Review on Google",
+    btnEasy: "Review on Easy",
+    
     discountTitle: "10% Discount Active!",
     discountText: "Screenshot this or show it to your waiter next time.",
     giftTitle: "Your Gift is Ready!",
@@ -91,8 +103,8 @@ export default function Page() {
   const [comment, setComment] = useState("");
   const [locale, setLocale] = useState<"ru"|"he"|"en">("ru");
   const [mounted, setMounted] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false); // true когда всё готово
-  const [rewardType, setRewardType] = useState<"discount" | "gift">("gift"); // Какой тип награды показывать
+  const [isSubmitted, setIsSubmitted] = useState(false); 
+  const [rewardType, setRewardType] = useState<"discount" | "gift">("gift"); 
   const [iconPositions, setIconPositions] = useState<{top: number, left: number, rotate: number}[]>([]);
 
   useEffect(() => {
@@ -110,34 +122,30 @@ export default function Page() {
   const t = translations[locale];
   const Icon = RESTAURANT_CONFIG.IconComponent;
 
-  const handleSubmit = async () => {
-    // ЛОГИКА 1: Плохой отзыв -> Телеграм -> Скидка
-    if (rating <= 3) {
-      setRewardType("discount");
-      const text = `🤬 *Жалоба (Клиент ждет скидку 10%)*\n🏢: ${RESTAURANT_CONFIG.name}\n⭐: ${rating}\n💬: ${comment || "Без текста"}`;
-      try {
-        await fetch(`https://api.telegram.org/bot${RESTAURANT_CONFIG.telegramToken}/sendMessage`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ chat_id: RESTAURANT_CONFIG.telegramChatId, text: text, parse_mode: "Markdown" })
-        });
-      } catch (e) {}
-      setIsSubmitted(true);
-    } 
-    // ЛОГИКА 2: Хороший отзыв -> Гугл (новая вкладка) -> Экран "Подарок"
-    else {
+  // Обработчик ПЛОХОГО отзыва
+  const handleBadSubmit = async () => {
+    setRewardType("discount");
+    const text = `🤬 *Жалоба (Клиент ждет скидку 10%)*\n🏢: ${RESTAURANT_CONFIG.name}\n⭐: ${rating}\n💬: ${comment || "Без текста"}`;
+    setIsSubmitted(true);
+    try {
+      await fetch(`https://api.telegram.org/bot${RESTAURANT_CONFIG.telegramToken}/sendMessage`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id: RESTAURANT_CONFIG.telegramChatId, text: text, parse_mode: "Markdown" })
+      });
+    } catch (e) {}
+  };
+
+  // Обработчик ХОРОШЕГО отзыва (переключение экрана)
+  const handleGoodClick = () => {
       setRewardType("gift");
-      // Открываем Гугл в новой вкладке
-      window.open(RESTAURANT_CONFIG.googleLink, '_blank');
-      // А на этом экране СРАЗУ показываем "Подарок"
       setIsSubmitted(true);
-    }
   };
 
   return (
     <main className="min-h-screen w-full flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans bg-gradient-to-br from-[#FFF8F0] via-[#FFE4D6] to-[#FFD6C9]" dir={locale === 'he' ? 'rtl' : 'ltr'}>
       
-      {/* SVG-ГРАДИЕНТ ЗОЛОТА */}
+      {/* SVG-ГРАДИЕНТ */}
       <svg width="0" height="0" className="absolute">
         <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop stopColor="#fbbf24" offset="0%" />
@@ -189,7 +197,6 @@ export default function Page() {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(251,146,60,0.15)] border border-white p-8"
         >
-            {/* Переключатель языков (скрываем на финальном экране) */}
             {!isSubmitted && (
                 <div className="flex justify-center mb-8">
                     <div className="bg-orange-50/50 p-1 rounded-full flex gap-1 border border-orange-100/50">
@@ -242,7 +249,7 @@ export default function Page() {
                                 key={rating <= 3 ? "low" : "high"}
                             >
                                 {rating <= 3 ? (
-                                    // 1-3 ЗВЕЗДЫ
+                                    // 1-3 ЗВЕЗДЫ: ФОРМА ЖАЛОБЫ
                                     <div className="space-y-4 pt-2">
                                         <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-left">
                                             <h3 className="font-bold text-red-900 text-sm mb-1">{t.lowRatingTitle}</h3>
@@ -252,20 +259,47 @@ export default function Page() {
                                             value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t.placeholder}
                                             className="w-full p-4 rounded-2xl bg-white border-0 text-gray-900 text-sm focus:ring-2 focus:ring-orange-400 outline-none resize-none h-28 placeholder:text-gray-400 shadow-inner"
                                         />
-                                        <motion.button whileTap={{ scale: 0.98 }} onClick={handleSubmit} className="w-full py-4 rounded-2xl font-bold text-white bg-slate-800 flex items-center justify-center gap-2 shadow-xl shadow-slate-300/50 hover:bg-black transition-all">
+                                        <motion.button whileTap={{ scale: 0.98 }} onClick={handleBadSubmit} className="w-full py-4 rounded-2xl font-bold text-white bg-slate-800 flex items-center justify-center gap-2 shadow-xl shadow-slate-300/50 hover:bg-black transition-all">
                                             <Percent size={18}/> {t.sendButton}
                                         </motion.button>
                                     </div>
                                 ) : (
-                                    // 4-5 ЗВЕЗД
+                                    // 4-5 ЗВЕЗД: ВЫБОР КНОПОК
                                     <div className="space-y-4 pt-2">
                                         <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-left">
                                             <h3 className="font-bold text-orange-900 text-sm mb-1">{t.highRatingTitle}</h3>
                                             <p className="text-orange-700/80 text-xs leading-relaxed">{t.highRatingText}</p>
                                         </div>
-                                        <motion.button whileTap={{ scale: 0.98 }} onClick={handleSubmit} className="w-full py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-orange-500 to-rose-500 flex items-center justify-center gap-2 shadow-xl shadow-orange-200 hover:opacity-90 transition-all">
-                                            <Gift size={18}/> {t.googleButton}
-                                        </motion.button>
+                                        
+                                        <div className="flex flex-col gap-3">
+                                            {/* Кнопка GOOGLE (если ссылка есть) */}
+                                            {RESTAURANT_CONFIG.googleLink && (
+                                                <motion.a 
+                                                    href={RESTAURANT_CONFIG.googleLink}
+                                                    target="_blank"
+                                                    rel="noreferrer noopener"
+                                                    whileTap={{ scale: 0.98 }} 
+                                                    onClick={handleGoodClick}
+                                                    className="w-full py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center gap-2 shadow-xl shadow-blue-200 hover:opacity-90 transition-all cursor-pointer no-underline"
+                                                >
+                                                    <Globe size={18}/> <span>{t.btnGoogle}</span>
+                                                </motion.a>
+                                            )}
+
+                                            {/* Кнопка EASY (если ссылка есть) */}
+                                            {RESTAURANT_CONFIG.easyLink && (
+                                                <motion.a 
+                                                    href={RESTAURANT_CONFIG.easyLink}
+                                                    target="_blank"
+                                                    rel="noreferrer noopener"
+                                                    whileTap={{ scale: 0.98 }} 
+                                                    onClick={handleGoodClick}
+                                                    className="w-full py-4 rounded-2xl font-bold text-gray-900 bg-yellow-400 flex items-center justify-center gap-2 shadow-xl shadow-yellow-200 hover:bg-yellow-500 transition-all cursor-pointer no-underline"
+                                                >
+                                                    <MapPin size={18}/> <span>{t.btnEasy}</span>
+                                                </motion.a>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </motion.div>
@@ -295,7 +329,6 @@ export default function Page() {
                         {rewardType === 'gift' ? t.giftText : t.discountText}
                     </p>
 
-                    {/* Визуальная "карточка" награды */}
                     <div className="mt-8 p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl w-full">
                         <div className="text-xs text-gray-400 uppercase font-bold tracking-widest mb-1">RepRadar Coupon</div>
                         <div className="text-lg font-black text-gray-800">
@@ -312,4 +345,4 @@ export default function Page() {
       </div>
     </main>
   );
-} 
+}
