@@ -1,348 +1,115 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Send, Star, UtensilsCrossed, Gift, Percent, MapPin, Globe } from "lucide-react";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { motion } from "framer-motion";
+import { Star, ShieldCheck, TrendingUp, ChevronRight, CheckCircle2 } from "lucide-react";
 
-// ==========================================
-// ⚙️ НАСТРОЙКИ (CONFIG)
-// ==========================================
-const RESTAURANT_CONFIG = {
-  name: "Тайский Рынок", 
-  sub: "Лучшая уличная еда",
-  
-  // КЛЮЧИ ТЕЛЕГРАМ:
-  telegramToken: "8565200728:AAG9sAXuAjx79bVjacs8NeYS1pAI9Uj93Pk", 
-  telegramChatId: "6132082486", 
-  
-  // === ССЫЛКИ ДЛЯ ОТЗЫВОВ ===
-  // Если ссылка пустая "" - кнопка не покажется.
-  // Если заполнены обе - покажутся обе.
-  
-  googleLink: "https://search.google.com/local/writereview?placeid=ChIJ3__dTNG7HRURVS_EbdpySNg", 
-  
-  // Вставь сюда ссылку на Easy (или оставь пустой "", если пока нет)
-  easyLink: "https://easy.co.il/en/page/10116028", 
-  
-  IconComponent: UtensilsCrossed, 
-  bgIcons: ["🍜", "🍤", "🍣", "🥢", "🍋", "🌶️", "🥥", "🍱"] 
-};
-
-function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
-
-// ==========================================
-// 📝 ПЕРЕВОДЫ
-// ==========================================
-const translations = {
-  ru: { 
-    title: "Вам понравилось?", 
-    
-    // Плохо (Скидка)
-    lowRatingTitle: "Давайте мириться!",
-    lowRatingText: "Мы допустили ошибку, но хотим её исправить. Ваша СКИДКА 10% на всё меню уже готова.",
-    placeholder: "Что именно пошло не так?",
-    sendButton: "Получить скидку 10%", 
-    
-    // Хорошо (Подарок)
-    highRatingTitle: "У вас отличный вкус!",
-    highRatingText: "Выберите, где оставить отзыв, и получите вкусный КОМПЛИМЕНТ от шефа.",
-    
-    btnGoogle: "Отзыв в Google",
-    btnEasy: "Отзыв в Easy",
-    
-    // Финал
-    discountTitle: "Скидка 10% активирована!",
-    discountText: "Сделайте скриншот или покажите этот экран официанту при следующем заказе.",
-    giftTitle: "Ваш подарок ждет!",
-    giftText: "Спасибо за отзыв! Покажите этот экран официанту и получите ваш комплимент.",
-    
-    lang: "Язык"
-  },
-  he: { 
-    title: "?נהניתם", 
-    lowRatingTitle: "!בואו נשלים",
-    lowRatingText: ".אנחנו רוצים לתקן את הרושם. קבלו 10% הנחה על כל התפריט לביקור הבא",
-    placeholder: "?מה פחות אהבתם",
-    sendButton: "לקבלת 10% הנחה", 
-    highRatingTitle: "!יש לכם טעם מעולה",
-    highRatingText: ".בחרו איפה לכתוב ביקורת וקבלו קינוח מתנה בביקור הבא",
-    
-    btnGoogle: "ביקורת ב-Google",
-    btnEasy: "ביקורת ב-Easy",
-    
-    discountTitle: "!הנחה 10% הופעלה",
-    discountText: ".צלמו מסך או הראו את ההודעה למלצר בביקור הבא",
-    giftTitle: "!המתנה שלכם מחכה",
-    giftText: ".תודה על הביקורת! הראו מסך זה למלצר לקבלת הפינוק",
-    lang: "שפה"
-  },
-  en: { 
-    title: "Did you enjoy it?", 
-    lowRatingTitle: "Let's make up!",
-    lowRatingText: "We want to fix our mistake. Your 10% DISCOUNT for the next visit is ready.",
-    placeholder: "What went wrong?",
-    sendButton: "Get 10% Discount", 
-    highRatingTitle: "You have great taste!",
-    highRatingText: "Choose where to leave a review and get a delicious COMPLIMENT.",
-    
-    btnGoogle: "Review on Google",
-    btnEasy: "Review on Easy",
-    
-    discountTitle: "10% Discount Active!",
-    discountText: "Screenshot this or show it to your waiter next time.",
-    giftTitle: "Your Gift is Ready!",
-    giftText: "Thanks for the review! Show this screen to the waiter to get your treat.",
-    lang: "Language"
-  },
-};
-
-export default function Page() {
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState("");
-  const [locale, setLocale] = useState<"ru"|"he"|"en">("ru");
-  const [mounted, setMounted] = useState(false);
-  const [isSubmitted, setIsSubmitted] = useState(false); 
-  const [rewardType, setRewardType] = useState<"discount" | "gift">("gift"); 
-  const [iconPositions, setIconPositions] = useState<{top: number, left: number, rotate: number}[]>([]);
-
-  useEffect(() => {
-    setMounted(true);
-    const positions = RESTAURANT_CONFIG.bgIcons.map(() => ({
-      top: Math.random() * 90, 
-      left: Math.random() * 90, 
-      rotate: Math.random() * 360
-    }));
-    setIconPositions(positions);
-  }, []);
-
-  if (!mounted) return null;
-
-  const t = translations[locale];
-  const Icon = RESTAURANT_CONFIG.IconComponent;
-
-  // Обработчик ПЛОХОГО отзыва
-  const handleBadSubmit = async () => {
-    setRewardType("discount");
-    const text = `🤬 *Жалоба (Клиент ждет скидку 10%)*\n🏢: ${RESTAURANT_CONFIG.name}\n⭐: ${rating}\n💬: ${comment || "Без текста"}`;
-    setIsSubmitted(true);
-    try {
-      await fetch(`https://api.telegram.org/bot${RESTAURANT_CONFIG.telegramToken}/sendMessage`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chat_id: RESTAURANT_CONFIG.telegramChatId, text: text, parse_mode: "Markdown" })
-      });
-    } catch (e) {}
-  };
-
-  // Обработчик ХОРОШЕГО отзыва (переключение экрана)
-  const handleGoodClick = () => {
-      setRewardType("gift");
-      setIsSubmitted(true);
-  };
-
+export default function LandingPage() {
   return (
-    <main className="min-h-screen w-full flex flex-col items-center justify-center p-6 relative overflow-hidden font-sans bg-gradient-to-br from-[#FFF8F0] via-[#FFE4D6] to-[#FFD6C9]" dir={locale === 'he' ? 'rtl' : 'ltr'}>
+    <main className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500 selection:text-white overflow-hidden relative">
       
-      {/* SVG-ГРАДИЕНТ */}
-      <svg width="0" height="0" className="absolute">
-        <linearGradient id="gold-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop stopColor="#fbbf24" offset="0%" />
-          <stop stopColor="#d97706" offset="100%" />
-        </linearGradient>
-      </svg>
-
-      {/* ФОН */}
-      <div className="fixed inset-0 pointer-events-none z-0">
-        {iconPositions.map((pos, i) => (
-          <motion.div
-            key={i}
-            className="absolute text-5xl opacity-40 mix-blend-multiply"
-            style={{ top: `${pos.top}%`, left: `${pos.left}%`, rotate: pos.rotate }}
-            animate={{ 
-              y: [0, -25, 0],
-              rotate: [pos.rotate, pos.rotate + 10, pos.rotate]
-            }}
-            transition={{ duration: 6 + i, repeat: Infinity, ease: "easeInOut" }}
-          >
-            {RESTAURANT_CONFIG.bgIcons[i]}
-          </motion.div>
-        ))}
+      {/* ФОНОВЫЕ ЭФФЕКТЫ */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-orange-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[40%] -right-[10%] w-[40%] h-[40%] bg-blue-500/10 blur-[120px] rounded-full" />
       </div>
 
-      {/* КОНТЕНТ */}
-      <div className="z-10 w-full max-w-md flex flex-col gap-6">
+      {/* HEADER */}
+      <header className="p-6 flex justify-between items-center max-w-6xl mx-auto relative z-10">
+        <div className="flex items-center gap-2 font-bold text-xl tracking-tighter">
+          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-red-500 rounded-lg flex items-center justify-center shadow-lg shadow-orange-500/20">
+            <Star className="w-5 h-5 text-white fill-white" />
+          </div>
+          RepRadar
+        </div>
+        <a href="https://wa.me/972555555555" className="px-5 py-2 rounded-full border border-white/10 hover:bg-white/10 transition-all text-sm font-medium">
+          Связаться с нами
+        </a>
+      </header>
+
+      {/* HERO SECTION */}
+      <section className="flex flex-col items-center justify-center text-center px-6 py-20 lg:py-32 max-w-4xl mx-auto relative z-10">
         
-        {/* Шапка */}
-        <motion.div initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="flex flex-col items-center text-center gap-5">
-            <div className="w-24 h-24 bg-white/60 backdrop-blur-md rounded-[2rem] shadow-xl shadow-orange-500/20 flex items-center justify-center p-1 border border-white">
-                <div className="w-full h-full bg-gradient-to-br from-orange-500 to-rose-500 rounded-[1.8rem] flex items-center justify-center shadow-inner">
-                    <Icon className="w-11 h-11 text-white" strokeWidth={2.5} />
-                </div>
-            </div>
-            <div>
-                <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-tight drop-shadow-sm">
-                    {RESTAURANT_CONFIG.name}
-                </h1>
-                <p className="text-orange-900/60 font-bold text-xs mt-1.5 uppercase tracking-widest">
-                    {RESTAURANT_CONFIG.sub}
-                </p>
-            </div>
-        </motion.div>
-
-        {/* Карточка */}
         <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] shadow-[0_20px_60px_-15px_rgba(251,146,60,0.15)] border border-white p-8"
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900 border border-slate-800 text-orange-400 text-xs font-bold uppercase tracking-widest mb-8 shadow-2xl"
         >
-            {!isSubmitted && (
-                <div className="flex justify-center mb-8">
-                    <div className="bg-orange-50/50 p-1 rounded-full flex gap-1 border border-orange-100/50">
-                        {["ru", "he", "en"].map((l) => (
-                            <button key={l} onClick={() => setLocale(l as any)} className={`px-4 py-1.5 rounded-full text-[11px] font-bold uppercase transition-all duration-300 ${locale === l ? 'bg-white text-orange-600 shadow-md transform scale-105' : 'text-gray-400 hover:text-gray-600'}`}>
-                                {l}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {!isSubmitted ? (
-                <>
-                    <h2 className="text-2xl font-extrabold text-gray-800 text-center mb-8">{t.title}</h2>
-                    
-                    {/* Звезды */}
-                    <div className="flex justify-center gap-2 mb-10" dir="ltr">
-                        {[1, 2, 3, 4, 5].map((star) => {
-                            const isActive = star <= rating;
-                            return (
-                                <motion.button 
-                                    key={star}
-                                    whileHover={{ scale: 1.2, rotate: 8 }}
-                                    whileTap={{ scale: 0.85, rotate: -8 }}
-                                    animate={{ 
-                                        scale: isActive ? 1.15 : 1,
-                                        filter: isActive ? "drop-shadow(0px 4px 8px rgba(251, 191, 36, 0.4))" : "none"
-                                    }}
-                                    transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                                    onClick={() => setRating(star)}
-                                    className="focus:outline-none relative"
-                                >
-                                    <Star 
-                                        fill={isActive ? "url(#gold-gradient)" : "none"}
-                                        className={`w-12 h-12 transition-all duration-300 ${isActive ? "text-transparent" : "text-orange-200 hover:text-orange-400"}`} 
-                                        strokeWidth={2} 
-                                    />
-                                </motion.button>
-                            );
-                        })}
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                        {rating > 0 && (
-                            <motion.div 
-                                initial={{ opacity: 0, y: 10 }} 
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                key={rating <= 3 ? "low" : "high"}
-                            >
-                                {rating <= 3 ? (
-                                    // 1-3 ЗВЕЗДЫ: ФОРМА ЖАЛОБЫ
-                                    <div className="space-y-4 pt-2">
-                                        <div className="bg-red-50 p-4 rounded-2xl border border-red-100 text-left">
-                                            <h3 className="font-bold text-red-900 text-sm mb-1">{t.lowRatingTitle}</h3>
-                                            <p className="text-red-700/80 text-xs leading-relaxed">{t.lowRatingText}</p>
-                                        </div>
-                                        <textarea 
-                                            value={comment} onChange={(e) => setComment(e.target.value)} placeholder={t.placeholder}
-                                            className="w-full p-4 rounded-2xl bg-white border-0 text-gray-900 text-sm focus:ring-2 focus:ring-orange-400 outline-none resize-none h-28 placeholder:text-gray-400 shadow-inner"
-                                        />
-                                        <motion.button whileTap={{ scale: 0.98 }} onClick={handleBadSubmit} className="w-full py-4 rounded-2xl font-bold text-white bg-slate-800 flex items-center justify-center gap-2 shadow-xl shadow-slate-300/50 hover:bg-black transition-all">
-                                            <Percent size={18}/> {t.sendButton}
-                                        </motion.button>
-                                    </div>
-                                ) : (
-                                    // 4-5 ЗВЕЗД: ВЫБОР КНОПОК
-                                    <div className="space-y-4 pt-2">
-                                        <div className="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-left">
-                                            <h3 className="font-bold text-orange-900 text-sm mb-1">{t.highRatingTitle}</h3>
-                                            <p className="text-orange-700/80 text-xs leading-relaxed">{t.highRatingText}</p>
-                                        </div>
-                                        
-                                        <div className="flex flex-col gap-3">
-                                            {/* Кнопка GOOGLE (если ссылка есть) */}
-                                            {RESTAURANT_CONFIG.googleLink && (
-                                                <motion.a 
-                                                    href={RESTAURANT_CONFIG.googleLink}
-                                                    target="_blank"
-                                                    rel="noreferrer noopener"
-                                                    whileTap={{ scale: 0.98 }} 
-                                                    onClick={handleGoodClick}
-                                                    className="w-full py-4 rounded-2xl font-bold text-white bg-gradient-to-r from-blue-500 to-blue-600 flex items-center justify-center gap-2 shadow-xl shadow-blue-200 hover:opacity-90 transition-all cursor-pointer no-underline"
-                                                >
-                                                    <Globe size={18}/> <span>{t.btnGoogle}</span>
-                                                </motion.a>
-                                            )}
-
-                                            {/* Кнопка EASY (если ссылка есть) */}
-                                            {RESTAURANT_CONFIG.easyLink && (
-                                                <motion.a 
-                                                    href={RESTAURANT_CONFIG.easyLink}
-                                                    target="_blank"
-                                                    rel="noreferrer noopener"
-                                                    whileTap={{ scale: 0.98 }} 
-                                                    onClick={handleGoodClick}
-                                                    className="w-full py-4 rounded-2xl font-bold text-gray-900 bg-yellow-400 flex items-center justify-center gap-2 shadow-xl shadow-yellow-200 hover:bg-yellow-500 transition-all cursor-pointer no-underline"
-                                                >
-                                                    <MapPin size={18}/> <span>{t.btnEasy}</span>
-                                                </motion.a>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </>
-            ) : (
-                // --- ФИНАЛЬНЫЙ ЭКРАН (НАГРАДА) ---
-                <motion.div 
-                    initial={{ scale: 0.8, opacity: 0 }} 
-                    animate={{ scale: 1, opacity: 1 }} 
-                    className="py-12 flex flex-col items-center"
-                >
-                    <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-inner ${rewardType === 'gift' ? 'bg-green-100' : 'bg-red-100'}`}>
-                        {rewardType === 'gift' ? (
-                            <Gift className="w-12 h-12 text-green-600 animate-bounce" />
-                        ) : (
-                            <Percent className="w-12 h-12 text-red-600" />
-                        )}
-                    </div>
-                    
-                    <h2 className="text-2xl font-black text-gray-900 mb-2 leading-tight">
-                        {rewardType === 'gift' ? t.giftTitle : t.discountTitle}
-                    </h2>
-                    
-                    <p className="text-gray-500 text-sm leading-relaxed max-w-[250px] mx-auto">
-                        {rewardType === 'gift' ? t.giftText : t.discountText}
-                    </p>
-
-                    <div className="mt-8 p-4 bg-white border-2 border-dashed border-gray-300 rounded-xl w-full">
-                        <div className="text-xs text-gray-400 uppercase font-bold tracking-widest mb-1">RepRadar Coupon</div>
-                        <div className="text-lg font-black text-gray-800">
-                            {rewardType === 'gift' ? "FREE DESSERT" : "-10% DISCOUNT"}
-                        </div>
-                    </div>
-                </motion.div>
-            )}
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span>
+          </span>
+          AI-Система защиты репутации
         </motion.div>
-      </div>
 
-      <div className="absolute bottom-6 text-orange-900/20 text-[10px] font-bold tracking-widest uppercase">
-        Powered by RepRadar
-      </div>
+        <motion.h1 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.1 }}
+          className="text-5xl lg:text-7xl font-black tracking-tight leading-[1.1] mb-6 bg-gradient-to-b from-white via-white to-gray-500 bg-clip-text text-transparent"
+        >
+          Превращаем гостей <br /> в <span className="text-orange-500">5 звезд в Google</span>
+        </motion.h1>
+
+        <motion.p 
+          initial={{ opacity: 0, y: 20 }} 
+          animate={{ opacity: 1, y: 0 }} 
+          transition={{ delay: 0.2 }}
+          className="text-lg text-gray-400 max-w-2xl mb-10 leading-relaxed"
+        >
+          Умный QR-код перехватывает негативные отзывы до публикации в интернет, а довольных клиентов мотивирует ставить 5 звезд. Рост рейтинга гарантирован.
+        </motion.p>
+
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }} 
+          animate={{ opacity: 1, scale: 1 }} 
+          transition={{ delay: 0.3 }}
+          className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto"
+        >
+          <a href="/beauty" className="px-8 py-4 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-400 hover:to-red-500 rounded-xl font-bold text-lg transition-all shadow-xl shadow-orange-500/20 flex items-center justify-center gap-2 group">
+            Смотреть Демо (Салон) <ChevronRight size={20} className="group-hover:translate-x-1 transition-transform"/>
+          </a>
+          <a href="/thai" className="px-8 py-4 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-xl font-bold text-lg transition-all flex items-center justify-center">
+            Демо (Ресторан)
+          </a>
+        </motion.div>
+
+        {/* TRUST BADGES */}
+        <div className="mt-16 flex flex-wrap justify-center gap-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+             {/* Можно добавить логотипы клиентов, если будут */}
+        </div>
+
+      </section>
+
+      {/* FEATURES GRID */}
+      <section className="px-6 py-20 bg-slate-900/50 border-t border-slate-800/50">
+        <div className="max-w-6xl mx-auto grid md:grid-cols-3 gap-8">
+            {[
+                { icon: ShieldCheck, title: "Фильтр Негатива", text: "Жалобы уходят вам в Telegram, а не в Google Maps.", color: "text-green-400" },
+                { icon: Star, title: "Рост Рейтинга", text: "Только довольные клиенты попадают на страницу отзывов.", color: "text-yellow-400" },
+                { icon: TrendingUp, title: "Возврат Клиентов", text: "Дарим скидку недовольным, чтобы они вернулись снова.", color: "text-blue-400" }
+            ].map((item, i) => (
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: i * 0.1 }}
+                    key={i} 
+                    className="p-8 rounded-3xl bg-slate-950 border border-slate-800 hover:border-slate-700 transition-colors"
+                >
+                    <div className={`w-12 h-12 rounded-2xl bg-slate-900 flex items-center justify-center mb-6 ${item.color}`}>
+                        <item.icon size={24} />
+                    </div>
+                    <h3 className="text-xl font-bold mb-3">{item.title}</h3>
+                    <p className="text-gray-400 leading-relaxed">{item.text}</p>
+                </motion.div>
+            ))}
+        </div>
+      </section>
+      
+      {/* FOOTER */}
+      <footer className="py-8 text-center text-gray-600 text-sm border-t border-slate-900">
+        © 2025 RepRadar. Haifa, Israel.
+      </footer>
     </main>
   );
 }
